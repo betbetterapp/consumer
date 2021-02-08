@@ -24,12 +24,12 @@ const job = schedule.scheduleJob("0 0 0 * * *", function () {
     start();
 });
 
-start();
+if (process.env.NODE_ENV === "development") start();
 
 async function start() {
     const leagues = await getLeagues();
     const fixturePromises = leagues.map(async league => {
-        return { [league.id]: await upcomingMatches(league.id) };
+        return { leagueId: league.id, items: await upcomingMatches(league.id) };
     });
 
     const fixtures = await Promise.all(fixturePromises);
