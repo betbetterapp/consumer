@@ -4,7 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import "./utils/date.js";
-import Fixture from "./models/Fixture.js";
+import FixtureModel from "./models/FixtureModel.js";
+import LeagueModel from "./models/LeaugeModel.js";
 import { createConnection } from "./database.js";
 
 const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;
@@ -14,12 +15,14 @@ interface League {
     name: string;
     type: string;
     logo: string;
+    country: object;
+    currentSeason: object;
+    lastUpdated: Date;
 }
 
 interface Fixture {
-    league: League;
-    country: object;
-    seasons: object[];
+    leagueId: number;
+    items: object[];
 }
 
 const job = schedule.scheduleJob("0 0 0 * * *", async function () {
@@ -29,31 +32,21 @@ const job = schedule.scheduleJob("0 0 0 * * *", async function () {
 if (process.env.NODE_ENV === "development") {
     start();
 } else {
-    console.log("No default execute because environment is not set to development.");
+    console.log(`No default execute because environment is set to ${process.env.NODE_ENV}.`);
     process.exit(0);
 }
 
 async function start() {
     try {
         await createConnection();
+        const leagues = await getLeagues();
+
+        leagues.map(league => {
+            upcomingMatches(league.id);
+        });
     } catch (error) {
         console.log("Error while creating connection to database:", error);
     }
-    const leagues = await getLeagues();
-    const fixturePromises = leagues.map(async league => {
-        return { leagueId: league.id, items: await upcomingMatches(league.id) };
-    });
-    const fixtures = await Promise.all(fixturePromises);
-    fixtures.forEach(fixture => {
-        const fixtureToSave = new Fixture({
-            leagueId: fixture.leagueId,
-            items: fixture.items,
-        });
-        fixtureToSave.save(err => {
-            if (err) return console.log("Error while saving fixture!", err);
-            console.log(`Fixture with id ${fixtureToSave.leagueId} saved.`);
-        });
-    });
 }
 
 async function upcomingMatches(leagueId: number, days = 30) {
@@ -70,7 +63,14 @@ async function upcomingMatches(leagueId: number, days = 30) {
                 "X-RapidAPI-Key": FOOTBALL_API_KEY,
             },
         });
-        return response;
+        const fixtureToSave = new FixtureModel({
+            leagueId: leagueId,
+            items: response,
+        });
+        fixtureToSave.save(err => {
+            if (err) return console.log("Error while saving fixture!", err);
+            console.log(`Fixtures for league with id ${fixtureToSave.leagueId} saved.`);
+        });
     } catch (error) {
         throw new Error(error);
     }
@@ -89,18 +89,25 @@ async function getLeagues() {
             },
         });
 
-        const fixtures: Fixture[] = data.response;
-        const filtered = fixtures.filter((fixture: Fixture) => leaguesToSearch.includes(fixture.league.id));
+        const fixtures = data.response;
+        const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
 
-        filtered.forEach(el => {
-            const league = {
+        filtered.forEach((el: any) => {
+            const league: League = {
                 id: el.league.id,
                 name: el.league.name,
                 type: el.league.type,
                 logo: el.league.logo,
                 country: el.country,
                 currentSeason: el.seasons[el.seasons.length - 1],
+                lastUpdated: new Date(),
             };
+            const leagueToSave = new LeagueModel(league);
+            leagueToSave.save(err => {
+                if (err) return console.log("Error while saving league!", err);
+                console.log(`League with id ${leagueToSave.id} saved.`);
+            });
+
             leagues.push(league);
         });
         return leagues; // store in db
