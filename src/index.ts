@@ -26,7 +26,12 @@ const job = schedule.scheduleJob("0 0 0 * * *", async function () {
     start();
 });
 
-if (process.env.NODE_ENV === "development") start();
+if (process.env.NODE_ENV === "development") {
+    start();
+} else {
+    console.log("No default execute because environment is not set to development.");
+    process.exit(0);
+}
 
 async function start() {
     try {
