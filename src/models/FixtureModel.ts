@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
+const { Schema } = mongoose;
 
-const FixtureSchema = new mongoose.Schema({
+const FixtureSchema = new Schema({
     leagueId: {
         type: Number,
         required: true,
