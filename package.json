@@ -5,8 +5,8 @@
     "main": "index.js",
     "type": "module",
     "scripts": {
-        "start": "set NODE_ENV=production && node build",
-        "dev": "set NODE_ENV=development && tsc && npm start",
+        "start": "set NODE_ENV=production&& node build",
+        "dev": "set NODE_ENV=development&& tsc && node build",
         "compile": "tsc"
     },
     "keywords": [],
