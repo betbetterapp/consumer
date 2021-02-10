@@ -9,8 +9,16 @@ import LeagueModel from "./models/LeaugeModel.js";
 import { createConnection } from "./database.js";
 
 const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;
+const job = schedule.scheduleJob("0 0 0 * * *", async function () {
+    start();
+});
 
-interface League {
+export interface Fixture {
+    leagueId: number;
+    items: [object];
+}
+
+export interface League {
     id: number;
     name: string;
     type: string;
@@ -19,15 +27,6 @@ interface League {
     currentSeason: object;
     lastUpdated: Date;
 }
-
-interface Fixture {
-    leagueId: number;
-    items: object[];
-}
-
-const job = schedule.scheduleJob("0 0 0 * * *", async function () {
-    start();
-});
 
 if (process.env.NODE_ENV === "development") {
     start();
@@ -93,7 +92,7 @@ async function getLeagues() {
         const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
 
         filtered.forEach((el: any) => {
-            const league: League = {
+            const leagueToSave = new LeagueModel({
                 id: el.league.id,
                 name: el.league.name,
                 type: el.league.type,
@@ -101,14 +100,13 @@ async function getLeagues() {
                 country: el.country,
                 currentSeason: el.seasons[el.seasons.length - 1],
                 lastUpdated: new Date(),
-            };
-            const leagueToSave = new LeagueModel(league);
+            });
             leagueToSave.save(err => {
                 if (err) return console.log("Error while saving league!", err);
                 console.log(`League with id ${leagueToSave.id} saved.`);
             });
 
-            leagues.push(league);
+            leagues.push(leagueToSave);
         });
         return leagues; // store in db
     } catch (error) {

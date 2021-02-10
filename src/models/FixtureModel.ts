@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { Fixture } from "..";
+import { Model } from "./model.js";
 const { Schema } = mongoose;
 
 const FixtureSchema = new Schema({
@@ -13,9 +15,4 @@ const FixtureSchema = new Schema({
     },
 });
 
-interface Fixture extends mongoose.Document {
-    leagueId: number;
-    items: [object];
-}
-
-export default mongoose.model<Fixture>("Fixture", FixtureSchema, "fixtures");
+export default mongoose.model<Model<Fixture>>("Fixture", FixtureSchema, "fixtures");

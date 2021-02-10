@@ -1,4 +1,6 @@
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
+import { League } from "..";
+import { Model } from "./model.js";
 const { Schema } = mongoose;
 
 const LeagueSchema = new Schema({
@@ -33,13 +35,4 @@ const LeagueSchema = new Schema({
     },
 });
 
-interface League extends mongoose.Document {
-    id: number;
-    name: string;
-    type: string;
-    logo: string;
-    country: object;
-    currentSeason: object;
-}
-
-export default mongoose.model<League>("League", LeagueSchema, "leagues");
+export default mongoose.model<Model<League>>("League", LeagueSchema, "leagues");
