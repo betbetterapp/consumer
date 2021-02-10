@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
+const { Schema } = mongoose;
+
 import { League } from "..";
 import { Model } from "./model.js";
-const { Schema } = mongoose;
 
 const LeagueSchema = new Schema({
     id: {
