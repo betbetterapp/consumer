@@ -62,10 +62,11 @@ async function upcomingMatches(leagueId: number, days = 30) {
                 "X-RapidAPI-Key": FOOTBALL_API_KEY,
             },
         });
-        const fixtureToSave = new FixtureModel({
+        const fixture: Fixture = {
             leagueId: leagueId,
             items: response,
-        });
+        };
+        const fixtureToSave = new FixtureModel(fixture);
         fixtureToSave.save(err => {
             if (err) return console.log("Error while saving fixture!", err);
             console.log(`Fixtures for league with id ${fixtureToSave.leagueId} saved.`);
@@ -92,7 +93,7 @@ async function getLeagues() {
         const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
 
         filtered.forEach((el: any) => {
-            const leagueToSave = new LeagueModel({
+            const league: League = {
                 id: el.league.id,
                 name: el.league.name,
                 type: el.league.type,
@@ -100,7 +101,8 @@ async function getLeagues() {
                 country: el.country,
                 currentSeason: el.seasons[el.seasons.length - 1],
                 lastUpdated: new Date(),
-            });
+            };
+            const leagueToSave = new LeagueModel(league);
             leagueToSave.save(err => {
                 if (err) return console.log("Error while saving league!", err);
                 console.log(`League with id ${leagueToSave.id} saved.`);

@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 import { Fixture } from "..";
-import { Model } from "./model.js";
 const { Schema } = mongoose;
+
+import { Model } from "./model.js";
 
 const FixtureSchema = new Schema({
     leagueId: {
