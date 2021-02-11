@@ -4,9 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import "./utils/date.js";
-import FixtureCollectionModel from "./models/FixtureCollectionModel.js";
-import LeagueModel from "./models/LeaugeModel.js";
-import { createConnection } from "./database.js";
+import * as db from "./database.js";
 
 const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;
 const FOOTBALL_API_BASE_URL = "https://v3.football.api-sports.io";
@@ -38,7 +36,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 async function start() {
-    await createConnection().then(async e => {
+    await db.createConnection().then(async e => {
         console.log("Database stuff happened:", e);
         const leagues = await getLeagues();
 
@@ -65,11 +63,9 @@ async function upcomingMatches(leagueId: number, days = 30) {
         items: response,
         lastUpdated: Date.now(),
     };
-    const fixtureToSave = new FixtureCollectionModel(fixture);
-    fixtureToSave.save(err => {
-        if (err) return console.log("Error while saving fixture!", err);
-        console.log(`Fixtures for league with id ${fixtureToSave.leagueId} saved.`);
-    });
+    db.insertFixtureCollection(fixture)
+        .then(res => console.log(res))
+        .catch(err => console.log(err));
 }
 
 async function getLeagues() {
@@ -86,9 +82,9 @@ async function getLeagues() {
     });
 
     const fixtures = data.response;
-    console.log("Got fixtures:", fixtures);
+    console.log("Got fixtures");
     const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
-    console.log("Filtered fixtures:", filtered);
+    console.log("Filtered fixtures");
     filtered.forEach((el: any) => {
         const league: League = {
             id: el.league.id,
@@ -99,12 +95,10 @@ async function getLeagues() {
             currentSeason: el.seasons[el.seasons.length - 1],
             lastUpdated: Date.now(),
         };
-        const leagueToSave = new LeagueModel(league);
-        leagueToSave.save(err => {
-            if (err) return console.log("Error while saving league!", err);
-            console.log(`League with id ${leagueToSave.id} saved.`);
-        });
-        leagues.push(leagueToSave);
+        db.insertLeague(league)
+            .then(res => console.log(res))
+            .catch(err => console.log(err));
+        leagues.push(league);
     });
-    return leagues; // store in db
+    return leagues;
 }
