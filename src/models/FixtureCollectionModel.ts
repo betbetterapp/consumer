@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 
 import { Model } from "./model.js";
 
-const FixtureSchema = new Schema({
+const FixtureCollectionSchema = new Schema({
     leagueId: {
         type: Number,
         required: true,
@@ -14,6 +14,11 @@ const FixtureSchema = new Schema({
         default: [],
         required: true,
     },
+    lastUpdated: {
+        type: Date,
+        default: Date.now(),
+        required: true,
+    },
 });
 
-export default mongoose.model<Model<Fixture>>("Fixture", FixtureSchema, "fixtures");
+export default mongoose.model<Model<Fixture>>("Fixture", FixtureCollectionSchema, "fixtures");
