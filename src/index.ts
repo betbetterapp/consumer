@@ -17,6 +17,7 @@ const job = schedule.scheduleJob("0 0 0 * * *", async function () {
 export interface Fixture {
     leagueId: number;
     items: [object];
+    lastUpdated: Number;
 }
 
 export interface League {
@@ -26,7 +27,7 @@ export interface League {
     logo: string;
     country: object;
     currentSeason: object;
-    lastUpdated: Date;
+    lastUpdated: Number;
 }
 
 if (process.env.NODE_ENV === "development") {
@@ -37,16 +38,14 @@ if (process.env.NODE_ENV === "development") {
 }
 
 async function start() {
-    try {
-        await createConnection();
+    await createConnection().then(async e => {
+        console.log("Database stuff happened:", e);
         const leagues = await getLeagues();
 
         leagues.map(league => {
             upcomingMatches(league.id);
         });
-    } catch (error) {
-        console.log("Error while creating connection to database:", error);
-    }
+    });
 }
 
 async function upcomingMatches(leagueId: number, days = 30) {
@@ -54,27 +53,23 @@ async function upcomingMatches(leagueId: number, days = 30) {
     const dates = [new Date(), new Date().addDays(days)].map(date => date.parse());
 
     const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${leagueId}&season=2020&from=${dates[0]}&to=${dates[1]}`;
-
-    try {
-        const {
-            data: { response },
-        } = await axios.get(url, {
-            headers: {
-                "X-RapidAPI-Key": FOOTBALL_API_KEY,
-            },
-        });
-        const fixture: Fixture = {
-            leagueId: leagueId,
-            items: response,
-        };
-        const fixtureToSave = new FixtureCollectionModel(fixture);
-        fixtureToSave.save(err => {
-            if (err) return console.log("Error while saving fixture!", err);
-            console.log(`Fixtures for league with id ${fixtureToSave.leagueId} saved.`);
-        });
-    } catch (error) {
-        throw new Error(error);
-    }
+    const {
+        data: { response },
+    } = await axios.get(url, {
+        headers: {
+            "X-RapidAPI-Key": FOOTBALL_API_KEY,
+        },
+    });
+    const fixture: Fixture = {
+        leagueId: leagueId,
+        items: response,
+        lastUpdated: Date.now(),
+    };
+    const fixtureToSave = new FixtureCollectionModel(fixture);
+    fixtureToSave.save(err => {
+        if (err) return console.log("Error while saving fixture!", err);
+        console.log(`Fixtures for league with id ${fixtureToSave.leagueId} saved.`);
+    });
 }
 
 async function getLeagues() {
@@ -83,36 +78,33 @@ async function getLeagues() {
     const leagues: League[] = [];
     const leaguesToSearch = [2, 78, 79, 81]; // Pull from db
 
-    try {
-        const { data } = await axios.get(`https://${FOOTBALL_API_BASE_URL}/leagues`, {
-            headers: {
-                "X-RapidAPI-Key": FOOTBALL_API_KEY,
-            },
+    console.log("Going for the football api call...");
+    const { data } = await axios.get(`${FOOTBALL_API_BASE_URL}/leagues`, {
+        headers: {
+            "X-RapidAPI-Key": FOOTBALL_API_KEY,
+        },
+    });
+
+    const fixtures = data.response;
+    console.log("Got fixtures:", fixtures);
+    const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
+    console.log("Filtered fixtures:", filtered);
+    filtered.forEach((el: any) => {
+        const league: League = {
+            id: el.league.id,
+            name: el.league.name,
+            type: el.league.type,
+            logo: el.league.logo,
+            country: el.country,
+            currentSeason: el.seasons[el.seasons.length - 1],
+            lastUpdated: Date.now(),
+        };
+        const leagueToSave = new LeagueModel(league);
+        leagueToSave.save(err => {
+            if (err) return console.log("Error while saving league!", err);
+            console.log(`League with id ${leagueToSave.id} saved.`);
         });
-
-        const fixtures = data.response;
-        const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id));
-
-        filtered.forEach((el: any) => {
-            const league: League = {
-                id: el.league.id,
-                name: el.league.name,
-                type: el.league.type,
-                logo: el.league.logo,
-                country: el.country,
-                currentSeason: el.seasons[el.seasons.length - 1],
-                lastUpdated: new Date(),
-            };
-            const leagueToSave = new LeagueModel(league);
-            leagueToSave.save(err => {
-                if (err) return console.log("Error while saving league!", err);
-                console.log(`League with id ${leagueToSave.id} saved.`);
-            });
-
-            leagues.push(leagueToSave);
-        });
-        return leagues; // store in db
-    } catch (error) {
-        throw new Error(error);
-    }
+        leagues.push(leagueToSave);
+    });
+    return leagues; // store in db
 }
