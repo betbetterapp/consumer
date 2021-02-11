@@ -32,7 +32,8 @@ const LeagueSchema = new Schema({
     },
     lastUpdated: {
         type: Date,
-        default: new Date(),
+        default: Date.now(),
+        required: true,
     },
 });
 
