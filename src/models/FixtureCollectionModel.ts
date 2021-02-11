@@ -15,7 +15,7 @@ const FixtureCollectionSchema = new Schema({
         required: true,
     },
     lastUpdated: {
-        type: Date,
+        type: Number, // Not to date to prevent unintentional formatting
         default: Date.now(),
         required: true,
     },
