@@ -5,6 +5,7 @@ dotenv.config();
 
 import "./utils/date.js";
 import * as db from "./database.js";
+import { scheduleLivePulling } from "./live-fixtures/live-fixtures.js";
 
 const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;
 const FOOTBALL_API_BASE_URL = "https://v3.football.api-sports.io";
@@ -45,6 +46,7 @@ async function start() {
             await upcomingMatches(league.id);
         }
     });
+    await scheduleLivePulling()
 }
 
 async function upcomingMatches(leagueId: number, days = 30) {
