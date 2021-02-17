@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { Fixture, League } from "./index.js";
-import FixtureCollectionModel from "./models/FixtureCollectionModel.js";
+import FixtureModel from "./models/FixtureModel.js";
 import LeagueModel from "./models/LeaugeModel.js";
 
 dotenv.config();
@@ -22,8 +22,8 @@ export function createConnection() {
     });
 }
 
-export function insertFixtureCollection(data: Fixture) {
-    return FixtureCollectionModel.updateOne({ leagueId: data.leagueId }, { $set: data }, { upsert: true, new: true });
+export async function insertFixture(data: Fixture) {
+    return FixtureModel.updateOne({ "fixture.id": data.fixture.id }, { $set: data }, { upsert: true, new: true });
 }
 
 export async function insertLeague(data: League) {

@@ -13,9 +13,11 @@ const job = schedule.scheduleJob("0 0 0 * * *", async function () {
 });
 
 export interface Fixture {
-    leagueId: number;
-    items: [object];
-    lastUpdated: Number;
+    fixture: any,
+    league: any,
+    teams: any,
+    goals: any,
+    score: any,
 }
 
 export interface League {
@@ -39,9 +41,9 @@ async function start() {
         console.log("Database stuff happened:", e);
         const leagues = await getLeagues();
 
-        leagues.map(league => {
-            upcomingMatches(league.id);
-        });
+        for (const league of leagues) {
+            await upcomingMatches(league.id);
+        }
     });
 }
 
@@ -57,14 +59,12 @@ async function upcomingMatches(leagueId: number, days = 30) {
             "X-RapidAPI-Key": FOOTBALL_API_KEY,
         },
     });
-    const fixture: Fixture = {
-        leagueId: leagueId,
-        items: response,
-        lastUpdated: Date.now(),
-    };
-    db.insertFixtureCollection(fixture)
-        .then(res => console.log(res))
-        .catch(err => console.log(err));
+
+    for (const item of response) {
+        await db.insertFixture(item)
+            .then(() => console.log(`Inserted fixture ${item.fixture.id} into database`))
+            .catch(err => console.error(err));
+    }
 }
 
 async function getLeagues() {
