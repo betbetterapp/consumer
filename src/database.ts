@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { Fixture, League } from "./index.js";
 import FixtureModel from "./models/FixtureModel.js";
 import LeagueModel from "./models/LeaugeModel.js";
+import { translateTeamName } from "./utils/translator.js"
 
 dotenv.config();
 
@@ -23,6 +24,8 @@ export function createConnection() {
 }
 
 export async function insertFixture(data: Fixture) {
+    data.teams.home.name = await translateTeamName(data.teams.home.name)
+    data.teams.away.name = await translateTeamName(data.teams.away.name)
     return FixtureModel.updateOne({ "fixture.id": data.fixture.id }, { $set: data }, { upsert: true, new: true });
 }
 
