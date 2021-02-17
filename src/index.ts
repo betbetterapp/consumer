@@ -32,7 +32,6 @@ if (process.env.NODE_ENV === "development") {
     start();
 } else {
     console.log(`No default execute because environment is set to ${process.env.NODE_ENV}.`);
-    process.exit(0);
 }
 
 async function start() {
