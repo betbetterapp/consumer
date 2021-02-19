@@ -7,8 +7,8 @@ import "./utils/date.js"
 import * as db from "./database.js"
 import { scheduleLivePulling } from "./live-fixtures/live-fixtures.js"
 
-const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY
-const FOOTBALL_API_BASE_URL = "https://v3.football.api-sports.io"
+export const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY
+export const FOOTBALL_API_BASE_URL = "https://v3.football.api-sports.io"
 const job = schedule.scheduleJob("0 0 0 * * *", async function () {
     start()
 })
