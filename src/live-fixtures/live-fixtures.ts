@@ -2,10 +2,10 @@ import FixtureModel from "../models/FixtureModel.js"
 import { Fixture, FOOTBALL_API_KEY, FOOTBALL_API_BASE_URL } from "../index.js"
 import schedule from "node-schedule"
 import axios from "axios"
+import { log } from "../utils/log.js"
+import chalk from "chalk"
 
 export async function scheduleLivePulling() {
-    console.log("=== Scheduling live pulling ===")
-
     const fixtures = await getAllFixtureItems()
     const fixturesToday = fixtures.filter(fixture => {
         const date = new Date(fixture.fixture.timestamp * 1000)
@@ -14,49 +14,55 @@ export async function scheduleLivePulling() {
         return date.isSameDay(today)
     })
 
-    console.log("== Matches today ===")
-    console.log("> " + fixturesToday.map(fixture => stringify(fixture)).join("\n> "))
+    log.header("Matches today")
+    fixturesToday.map(fixture => stringify(fixture)).forEach(match => log.info(match))
 
-    console.log("== Scheduling jobs ===")
+    log.header("Scheduling live pulling jobs")
     const alreadyScheduled: string[] = []
-    fixturesToday.forEach(fixture => {
+    for (const fixture of fixturesToday) {
         const identifier = `${fixture.league.id}@${fixture.fixture.timestamp}`
         if (alreadyScheduled.includes(identifier)) {
-            console.log(`> Already got scheduled job for ${stringify(fixture)}`)
+            log.info(`Already got job including ${stringify(fixture)}`)
         } else {
-            scheduleJob(fixture.league.id, fixture.fixture.timestamp)
-            console.log(`> Scheduled new job for ${stringify(fixture)}`)
+            await scheduleJob(fixture.league, fixture.fixture.timestamp)
+            log.info(`Scheduled new job for ${stringify(fixture)}`)
             alreadyScheduled.push(identifier)
         }
-    })
+    }
 }
 
-function scheduleJob(leagueId: number, startTime: number) {
-    const date = new Date(startTime * 1000 + 60_000)
+async function scheduleJob(league: any, startTime: number) {
+    const action = async () => {
+        log.info(`Starting live pulling for ${stringifyLeague(league)}...`)
 
-    schedule.scheduleJob(date, async () => {
-        console.log(`> Starting live pulling for league ${leagueId}...`)
-
-        if (await pullLiveFixtures(leagueId)) {
+        if (await pullLiveFixtures(league)) {
             const id = setInterval(async () => {
-                if (!(await pullLiveFixtures(leagueId))) {
+                if (!(await pullLiveFixtures(league))) {
                     clearInterval(id)
-                    console.log(`> Finished live pulling for league ${leagueId}`)
+                    log.info(`Finished live pulling for ${stringifyLeague(league)}`)
                 }
             }, 450_000)
         } else {
-            console.log(`! First live pull for league ${leagueId} failed, abandoning...`)
+            log.err(`First live pull for ${stringifyLeague(league)} failed, abandoning...`)
         }
-    })
+    }
+
+    const date = new Date(startTime * 1000 + 60_000)
+    const job = schedule.scheduleJob(date, action)
+
+    if (job == null) {
+        log.warn("Match has already started, instantly invoking job")
+        await action()
+    }
 }
 
-async function pullLiveFixtures(leagueId: number): Promise<boolean> {
+async function pullLiveFixtures(league: any): Promise<boolean> {
     try {
-        const url = `${FOOTBALL_API_BASE_URL}/fixtures?live=all&league=${leagueId}`
+        const url = `${FOOTBALL_API_BASE_URL}/fixtures?live=all&league=${league.id}`
         const {
             data: { response },
         } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
-        console.log("Response =", response)
+        log.info("Response =", response)
         return true
     } catch (e) {
         return false
@@ -65,9 +71,16 @@ async function pullLiveFixtures(leagueId: number): Promise<boolean> {
 
 function stringify(fixture: any): string {
     const date = new Date(fixture.fixture.timestamp * 1000)
-    const hh = date.getHours().toPrecision(2)
-    const mm = date.getMinutes().toPrecision(2)
-    return `Match(\"${fixture.teams.home.name}\" vs \"${fixture.teams.away.name}\" @ ${hh}:${mm} in ${fixture.league.name})`
+
+    return chalk.yellow("Match") + chalk.gray("(") + chalk.magenta(fixture.teams.home.name) +
+        chalk.white(" vs ") + chalk.magenta(fixture.teams.away.name) +
+        chalk.gray(" @ ") + chalk.white(date.formatClock()) +
+        chalk.white(" in ") + chalk.white(fixture.league.name) + chalk.gray(")")
+}
+
+function stringifyLeague(league: any): string {
+    return chalk.yellow("League") + chalk.gray("(") + chalk.magenta(league.name) +
+        chalk.gray(" #") + chalk.white(league.id) + chalk.gray(")")
 }
 
 function getAllFixtureItems(): Promise<Fixture[]> {
