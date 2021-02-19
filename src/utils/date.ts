@@ -1,12 +1,13 @@
+import "./number.js"
+
 export {}
 
 declare global {
     interface Date {
         addDays(days: number): Date;
-
         parse(): String;
-
         isSameDay(other: Date): boolean;
+        formatClock(withSeconds?: boolean): string
     }
 }
 
@@ -26,4 +27,16 @@ Date.prototype.parse = function(): String {
 
 Date.prototype.isSameDay = function(b: Date): boolean {
     return this.getDate() === b.getDate() && this.getMonth() == b.getMonth() && this.getFullYear() == b.getFullYear()
+}
+
+Date.prototype.formatClock = function(withSeconds: boolean = false): string {
+    const hh = this.getHours().prependZeroes(2)
+    const mm = this.getMinutes().prependZeroes(2)
+
+    if (withSeconds) {
+        const ss = this.getSeconds().prependZeroes(2)
+        return `${hh}:${mm}:${ss}`
+    } else {
+        return `${hh}:${mm}`
+    }
 }
