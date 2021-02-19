@@ -4,19 +4,18 @@ import { Fixture, League } from "./index.js";
 import FixtureModel from "./models/FixtureModel.js";
 import LeagueModel from "./models/LeaugeModel.js";
 import { translateTeamName } from "./utils/translator.js"
+import { log } from "./utils/log.js"
 
 dotenv.config();
-
-console.log(process.env.MONGO_URI);
 
 export function createConnection() {
     return new Promise((resolve, reject) => {
         mongoose.connect(process.env.MONGO_URI!, { useFindAndModify: false, useUnifiedTopology: true, useNewUrlParser: true }, err => {
             if (err) {
-                console.log("Error db", err);
+                log.err("Error while connecting to database:", err);
                 reject(err);
             } else {
-                console.log("Connected to db");
+                log.info("Database connection successfully established");
                 resolve("Connected to db");
             }
         });

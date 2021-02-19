@@ -6,6 +6,7 @@ dotenv.config()
 import "./utils/date.js"
 import * as db from "./database.js"
 import { scheduleLivePulling } from "./live-fixtures/live-fixtures.js"
+import { log } from "./utils/log.js"
 
 export const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY
 export const FOOTBALL_API_BASE_URL = "https://v3.football.api-sports.io"
@@ -34,12 +35,11 @@ export interface League {
 if (process.env.NODE_ENV === "development") {
     start()
 } else {
-    console.log(`No default execute because environment is set to ${process.env.NODE_ENV}.`)
+    log.info(`No default execute because environment is set to ${process.env.NODE_ENV}.`)
 }
 
 async function start() {
     await db.createConnection().then(async e => {
-        console.log("Database stuff happened:", e)
         // const leagues = await getLeagues();
 
         // for (const league of leagues) {
@@ -50,7 +50,7 @@ async function start() {
 }
 
 async function upcomingMatches(leagueId: number, days = 30) {
-    console.log("Fetching upcoming matches")
+    log.info("Fetching upcoming matches")
     const dates = [new Date(), new Date().addDays(days)].map(date => date.parse())
 
     const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${leagueId}&season=2020&from=${dates[0]}&to=${dates[1]}`
@@ -65,28 +65,27 @@ async function upcomingMatches(leagueId: number, days = 30) {
     for (const item of response) {
         await db
             .insertFixture(item)
-            .then(() => console.log(`Inserted fixture ${item.fixture.id} into database`))
-            .catch(err => console.error(err))
+            .then(() => log.info(`Inserted fixture ${item.fixture.id} into database`))
+            .catch(err => log.err(err))
     }
 }
 
 async function getLeagues() {
-    console.log("Fetching leagues")
+    log.header("Fetching leagues")
 
     const leagues: League[] = []
     const leaguesToSearch = [2, 78, 79, 81] // Pull from db
 
-    console.log("Going for the football api call...")
+    log.info("Going for the football api call...")
     const { data } = await axios.get(`${FOOTBALL_API_BASE_URL}/leagues`, {
         headers: {
             "X-RapidAPI-Key": FOOTBALL_API_KEY,
         },
     })
 
-    const fixtures = data.response
-    console.log("Got fixtures")
+    const fixtures = data.response as any[]
+    log.info(`Received ${fixtures.length} fixtures from the football api`)
     const filtered = fixtures.filter((fixture: any) => leaguesToSearch.includes(fixture.league.id))
-    console.log("Filtered fixtures")
     filtered.forEach((el: any) => {
         const league: League = {
             id: el.league.id,
@@ -98,8 +97,8 @@ async function getLeagues() {
             lastUpdated: Date.now(),
         }
         db.insertLeague(league)
-            .then(res => console.log(res))
-            .catch(err => console.log(err))
+            .then(res => log.info(res))
+            .catch(err => log.err(err))
         leagues.push(league)
     })
     return leagues
