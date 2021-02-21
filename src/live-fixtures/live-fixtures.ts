@@ -7,6 +7,8 @@ import c from "chalk"
 import * as db from "../database.js"
 import { LiveFixture } from "../models/LiveFixtureModel.js"
 
+let fixturesPerJob: { [identifier: string]: Fixture[] }
+
 export async function scheduleLivePulling() {
     const fixtures = await getAllFixtureItems()
     const fixturesToday = fixtures.filter(fixture => {
@@ -21,6 +23,8 @@ export async function scheduleLivePulling() {
 
     log.header("Scheduling live pulling jobs")
     const alreadyScheduled: string[] = []
+    fixturesPerJob = {}
+
     for (const fixture of fixturesToday) {
         const identifier = `${fixture.league.id}@${fixture.fixture.timestamp}`
         if (alreadyScheduled.includes(identifier)) {
@@ -30,13 +34,13 @@ export async function scheduleLivePulling() {
             log.info(`Scheduled new job for ${stringify(fixture)}`)
             alreadyScheduled.push(identifier)
         }
+        fixturesPerJob[identifier] = (fixturesPerJob[identifier] ?? []).concat(fixture)
     }
 }
 
 async function scheduleJob(league: FixtureLeague, startTime: number) {
     const action = async () => {
         log.info(`Starting live pulling for ${stringifyLeague(league)}...`)
-
         if (await pullLiveFixtures(league, startTime)) {
             const id = setInterval(async () => {
                 if (!(await pullLiveFixtures(league, startTime))) {
@@ -54,17 +58,27 @@ async function scheduleJob(league: FixtureLeague, startTime: number) {
 
     if (job == null) {
         log.warn("Match has already started, instantly invoking job")
-        await action()
+        action()
     }
 }
 
 async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promise<boolean> {
-    log.header("Pulling live fixture")
     try {
         const url = `${FOOTBALL_API_BASE_URL}/fixtures?live=all&league=${league.id}`
         const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
         const response: LiveFixture[] = data.response
-        if (data.errors.length > 0 || (response.length === 0 && Date.now() > startTime * 1000 + 600_000)) return false
+
+        if (data.errors.length > 0) {
+            log.err(`An error occurred while pulling live fixtures for league ${league.name}`)
+            log.info("Data:", data)
+            return false
+        } else if (response.length === 0 && Date.now() > startTime * 1000 + 600_000) {
+            log.info(`No more live games for league in ${league.name}`)
+            const coveredFixtures = fixturesPerJob[`${league.id}@${startTime}`]
+
+            if (await ensureMatchEnd(coveredFixtures)) return false
+        }
+
         for (const item of response) {
             await db
                 .insertLiveFixture(item)
@@ -73,8 +87,33 @@ async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promi
         }
         return true
     } catch (e) {
+        log.err(`An error occurred while pulling live fixtures for league ${league.name}`)
+        log.info(e)
         return false
     }
+}
+
+async function ensureMatchEnd(fixtures: Fixture[]) {
+    // TODO: Update matches in fixtures database
+    let allFinished = true
+    const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${fixtures[0].league.id}&season=2020&date=${new Date().formatDate(true)}`
+    const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
+    const response: Fixture[] = data.response
+    log.header("Ensuring match end")
+    log.info("League id:", fixtures[0].league.id)
+    for (const match of response) {
+        fixtures.forEach(fixture => {
+            const matchStatus = match.fixture.status.short
+            if (fixture.fixture.id === match.fixture.id) {
+                const invalidMatchStatus = ["FT", "AET", "PEN", "PST", "CANC", "ABD"]
+                if (!invalidMatchStatus.includes(matchStatus)) {
+                    allFinished = false
+                }
+            }
+        })
+    }
+    log.info(allFinished ? "All matches ended" : "Matches are still running")
+    return allFinished
 }
 
 function stringify(fixture: Fixture): string {
@@ -94,7 +133,7 @@ function stringify(fixture: Fixture): string {
     )
 }
 
-function stringifyLeague(league: any): string {
+function stringifyLeague(league: FixtureLeague): string {
     return c.yellow("League") + c.gray("(") + c.magenta(league.name) + c.gray(" #") + c.white(league.id) + c.gray(")")
 }
 
