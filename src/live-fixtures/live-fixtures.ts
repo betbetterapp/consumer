@@ -1,15 +1,17 @@
 import FixtureModel from "../models/FixtureModel.js"
-import { Fixture, FOOTBALL_API_KEY, FOOTBALL_API_BASE_URL } from "../index.js"
+import { Fixture, FixtureLeague, FOOTBALL_API_KEY, FOOTBALL_API_BASE_URL } from "../index.js"
 import schedule from "node-schedule"
 import axios from "axios"
 import { log } from "../utils/log.js"
-import chalk from "chalk"
+import c from "chalk"
+import * as db from "../database.js"
+import { LiveFixture } from "../models/LiveFixtureModel.js"
 
 export async function scheduleLivePulling() {
     const fixtures = await getAllFixtureItems()
     const fixturesToday = fixtures.filter(fixture => {
         const date = new Date(fixture.fixture.timestamp * 1000)
-        const today = new Date() // remove this after testing
+        const today = new Date()
 
         return date.isSameDay(today)
     })
@@ -31,13 +33,13 @@ export async function scheduleLivePulling() {
     }
 }
 
-async function scheduleJob(league: any, startTime: number) {
+async function scheduleJob(league: FixtureLeague, startTime: number) {
     const action = async () => {
         log.info(`Starting live pulling for ${stringifyLeague(league)}...`)
 
-        if (await pullLiveFixtures(league)) {
+        if (await pullLiveFixtures(league, startTime)) {
             const id = setInterval(async () => {
-                if (!(await pullLiveFixtures(league))) {
+                if (!(await pullLiveFixtures(league, startTime))) {
                     clearInterval(id)
                     log.info(`Finished live pulling for ${stringifyLeague(league)}`)
                 }
@@ -56,31 +58,44 @@ async function scheduleJob(league: any, startTime: number) {
     }
 }
 
-async function pullLiveFixtures(league: any): Promise<boolean> {
+async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promise<boolean> {
+    log.header("Pulling live fixture")
     try {
         const url = `${FOOTBALL_API_BASE_URL}/fixtures?live=all&league=${league.id}`
-        const {
-            data: { response },
-        } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
-        log.info("Response =", response)
+        const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
+        const response: LiveFixture[] = data.response
+        if (data.errors.length > 0 || (response.length === 0 && Date.now() > startTime * 1000 + 600_000)) return false
+        for (const item of response) {
+            await db
+                .insertLiveFixture(item)
+                .then(() => log.info(`Inserted live fixture ${item.fixture.id} into database`))
+                .catch(err => log.err(err))
+        }
         return true
     } catch (e) {
         return false
     }
 }
 
-function stringify(fixture: any): string {
+function stringify(fixture: Fixture): string {
     const date = new Date(fixture.fixture.timestamp * 1000)
 
-    return chalk.yellow("Match") + chalk.gray("(") + chalk.magenta(fixture.teams.home.name) +
-        chalk.white(" vs ") + chalk.magenta(fixture.teams.away.name) +
-        chalk.gray(" @ ") + chalk.white(date.formatClock()) +
-        chalk.white(" in ") + chalk.white(fixture.league.name) + chalk.gray(")")
+    return (
+        c.yellow("Match") +
+        c.gray("(") +
+        c.magenta(fixture.teams.home.name) +
+        c.white(" vs ") +
+        c.magenta(fixture.teams.away.name) +
+        c.gray(" @ ") +
+        c.white(date.formatClock()) +
+        c.white(" in ") +
+        c.white(fixture.league.name) +
+        c.gray(")")
+    )
 }
 
 function stringifyLeague(league: any): string {
-    return chalk.yellow("League") + chalk.gray("(") + chalk.magenta(league.name) +
-        chalk.gray(" #") + chalk.white(league.id) + chalk.gray(")")
+    return c.yellow("League") + c.gray("(") + c.magenta(league.name) + c.gray(" #") + c.white(league.id) + c.gray(")")
 }
 
 function getAllFixtureItems(): Promise<Fixture[]> {
