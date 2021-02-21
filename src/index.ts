@@ -16,10 +16,19 @@ const job = schedule.scheduleJob("0 0 0 * * *", async function () {
 
 export interface Fixture {
     fixture: any
-    league: any
+    league: FixtureLeague
     teams: any
     goals: any
     score: any
+}
+export interface FixtureLeague {
+    id: number
+    name: string
+    country: string
+    logo: string
+    flag: string | null
+    season: number
+    round: string
 }
 
 export interface League {
@@ -41,7 +50,6 @@ if (process.env.NODE_ENV === "development") {
 async function start() {
     await db.createConnection().then(async e => {
         // const leagues = await getLeagues();
-
         // for (const league of leagues) {
         //     await upcomingMatches(league.id);
         // }
