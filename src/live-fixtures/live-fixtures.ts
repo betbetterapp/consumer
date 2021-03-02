@@ -5,7 +5,7 @@ import axios from "axios"
 import { log } from "../utils/log.js"
 import c from "chalk"
 import * as db from "../database.js"
-import { LiveFixture } from "../models/LiveFixtureModel.js"
+import LiveFixtureModel, { LiveFixture } from "../models/LiveFixtureModel.js"
 
 let fixturesPerJob: { [identifier: string]: Fixture[] }
 
@@ -15,6 +15,10 @@ export async function scheduleLivePulling() {
         const date = new Date(fixture.fixture.timestamp * 1000)
         const today = new Date()
 
+        const status = fixture.fixture.status.short
+        if (status === "PST" || status === "SUSP") {
+            return false
+        }
         return date.isSameDay(today)
     })
 
@@ -76,7 +80,15 @@ async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promi
             log.info(`No more live games for league in ${league.name}`)
             const coveredFixtures = fixturesPerJob[`${league.id}@${startTime}`]
 
-            if (await ensureMatchEnd(coveredFixtures)) return false
+            const matchEnd = await ensureMatchEnd(coveredFixtures)
+            if (matchEnd.finished) {
+                matchEnd.matches.forEach(async match => {
+                    log.info(`Inserting fixture with ${match.fixture.id} in fixture collection.`)
+                    await FixtureModel.updateOne({ "fixture.id": match.fixture.id }, { $set: match })
+                    await LiveFixtureModel.deleteOne({ "fixture.id": match.fixture.id })
+                })
+                return false
+            }
         }
 
         for (const item of response) {
@@ -101,6 +113,9 @@ async function ensureMatchEnd(fixtures: Fixture[]) {
     const response: Fixture[] = data.response
     log.header("Ensuring match end")
     log.info("League id:", fixtures[0].league.id)
+    let matches: Fixture[] = []
+
+    console.log("ALL Fixtures", data)
     for (const match of response) {
         fixtures.forEach(fixture => {
             const matchStatus = match.fixture.status.short
@@ -108,12 +123,14 @@ async function ensureMatchEnd(fixtures: Fixture[]) {
                 const invalidMatchStatus = ["FT", "AET", "PEN", "PST", "CANC", "ABD"]
                 if (!invalidMatchStatus.includes(matchStatus)) {
                     allFinished = false
+                } else {
+                    matches.push(match)
                 }
             }
         })
     }
     log.info(allFinished ? "All matches ended" : "Matches are still running")
-    return allFinished
+    return { finished: allFinished, matches }
 }
 
 function stringify(fixture: Fixture): string {
