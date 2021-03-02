@@ -1,7 +1,7 @@
 import schedule from "node-schedule"
 import axios from "axios"
 import dotenv from "dotenv"
-dotenv.config()
+dotenv.config({ path: "./.env" })
 
 import "./utils/date.js"
 import * as db from "./database.js"
@@ -48,6 +48,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 async function start() {
+    log.info("Football api key:", FOOTBALL_API_KEY)
     await db.createConnection().then(async e => {
         // const leagues = await getLeagues();
         // for (const league of leagues) {
