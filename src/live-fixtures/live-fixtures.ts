@@ -57,7 +57,7 @@ async function scheduleJob(league: FixtureLeague, startTime: number) {
         }
     }
 
-    const date = new Date(startTime * 1000 + 60_000)
+    const date = new Date(startTime * 1000 + 120_000)
     const job = schedule.scheduleJob(date, action)
 
     if (job == null) {
@@ -106,7 +106,6 @@ async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promi
 }
 
 async function ensureMatchEnd(fixtures: Fixture[]) {
-    // TODO: Update matches in fixtures database
     let allFinished = true
     const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${fixtures[0].league.id}&season=2020&date=${new Date().formatDate(true)}`
     const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
