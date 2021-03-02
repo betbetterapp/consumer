@@ -50,10 +50,10 @@ if (process.env.NODE_ENV === "development") {
 async function start() {
     log.info("Football api key:", FOOTBALL_API_KEY)
     await db.createConnection().then(async e => {
-        // const leagues = await getLeagues();
-        // for (const league of leagues) {
-        //     await upcomingMatches(league.id);
-        // }
+        const leagues = await getLeagues()
+        for (const league of leagues) {
+            await upcomingMatches(league.id)
+        }
     })
     await scheduleLivePulling()
 }
@@ -72,10 +72,13 @@ async function upcomingMatches(leagueId: number, days = 30) {
     })
 
     for (const item of response) {
-        await db
-            .insertFixture(item)
-            .then(() => log.info(`Inserted fixture ${item.fixture.id} into database`))
-            .catch(err => log.err(err))
+        if (item.fixture.status.short !== "PST") {
+            console.log(item.fixture.status, "FIXTURE STATUS INSERT")
+            await db
+                .insertFixture(item)
+                .then(() => log.info(`Inserted fixture ${item.fixture.id} into database`))
+                .catch(err => log.err(err))
+        }
     }
 }
 
