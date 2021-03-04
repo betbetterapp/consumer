@@ -22,23 +22,27 @@ export async function scheduleLivePulling() {
         return date.isSameDay(today)
     })
 
-    log.header("Matches today")
-    fixturesToday.map(fixture => stringify(fixture)).forEach(match => log.info(match))
+    if (fixturesToday.length > 0) {
+        log.header("Matches today")
+        fixturesToday.map(fixture => stringify(fixture)).forEach(match => log.info(match))
 
-    log.header("Scheduling live pulling jobs")
-    const alreadyScheduled: string[] = []
-    fixturesPerJob = {}
+        log.header("Scheduling live pulling jobs")
+        const alreadyScheduled: string[] = []
+        fixturesPerJob = {}
 
-    for (const fixture of fixturesToday) {
-        const identifier = `${fixture.league.id}@${fixture.fixture.timestamp}`
-        if (alreadyScheduled.includes(identifier)) {
-            log.info(`Already got job including ${stringify(fixture)}`)
-        } else {
-            await scheduleJob(fixture.league, fixture.fixture.timestamp)
-            log.info(`Scheduled new job for ${stringify(fixture)}`)
-            alreadyScheduled.push(identifier)
+        for (const fixture of fixturesToday) {
+            const identifier = `${fixture.league.id}@${fixture.fixture.timestamp}`
+            if (alreadyScheduled.includes(identifier)) {
+                log.info(`Already got job including ${stringify(fixture)}`)
+            } else {
+                await scheduleJob(fixture.league, fixture.fixture.timestamp)
+                log.info(`Scheduled new job for ${stringify(fixture)}`)
+                alreadyScheduled.push(identifier)
+            }
+            fixturesPerJob[identifier] = (fixturesPerJob[identifier] ?? []).concat(fixture)
         }
-        fixturesPerJob[identifier] = (fixturesPerJob[identifier] ?? []).concat(fixture)
+    } else {
+        log.info("There are no matches today!")
     }
 }
 
