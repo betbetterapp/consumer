@@ -42,17 +42,18 @@ Date.prototype.formatClock = function (withSeconds: boolean = false): string {
     }
 }
 
-Date.prototype.formatDate = function (reverse: boolean) {
+Date.prototype.formatDate = function (reverse) {
     const date = new Date(this)
-    let dateString = `${date.getDate()}-${formatMonth(date.getMonth() + 1)}-${date.getFullYear()}`
+    let dateString = `${format(date.getDate(), 2)}-${format(date.getMonth() + 1, 2)}-${date.getFullYear()}`
     if (reverse) dateString = dateString.split("-").reverse().join("-")
+    console.log("Formatted date: ", dateString)
     return dateString
 }
 
-function formatMonth(month) {
-    month = month.toString()
-    if (month.length < 2) {
-        return (month = "0" + month)
+function format(i, length) {
+    i = i.toString()
+    if (i.length < length) {
+        return (i = "0" + i)
     }
-    return month
+    return i
 }
