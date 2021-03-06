@@ -50,10 +50,10 @@ if (process.env.NODE_ENV === "development") {
 async function start() {
     log.info("Football api key:", FOOTBALL_API_KEY)
     await db.createConnection().then(async e => {
-        const leagues = await getLeagues()
-        for (const league of leagues) {
-            await upcomingMatches(league.id)
-        }
+        // const leagues = await getLeagues()
+        // for (const league of leagues) {
+        //     await upcomingMatches(league.id)
+        // }
     })
     await scheduleLivePulling()
 }
