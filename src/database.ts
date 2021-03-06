@@ -10,17 +10,14 @@ import { log } from "./utils/log.js"
 dotenv.config()
 
 export function createConnection() {
-    return new Promise((resolve, reject) => {
-        mongoose.connect(process.env.MONGO_URI!, { useFindAndModify: false, useUnifiedTopology: true, useNewUrlParser: true }, err => {
-            if (err) {
-                log.err("Error while connecting to database:", err)
-                reject(err)
-            } else {
-                log.info("Database connection successfully established")
-                resolve("Connected to db")
-            }
+    return mongoose
+        .connect(process.env.MONGO_URI!!, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false })
+        .then(() => {
+            console.log("> Successfully connected to db")
         })
-    })
+        .catch(err => {
+            throw new Error(err)
+        })
 }
 
 export async function insertFixture(data: Fixture) {
