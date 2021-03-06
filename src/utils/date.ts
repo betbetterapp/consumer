@@ -8,7 +8,6 @@ declare global {
         parse(): String
         isSameDay(other: Date): boolean
         formatClock(withSeconds?: boolean): string
-        formatDate(reverse: boolean)
     }
 }
 
@@ -40,20 +39,4 @@ Date.prototype.formatClock = function (withSeconds: boolean = false): string {
     } else {
         return `${hh}:${mm}`
     }
-}
-
-Date.prototype.formatDate = function (reverse) {
-    const date = new Date(this)
-    let dateString = `${format(date.getDate(), 2)}-${format(date.getMonth() + 1, 2)}-${date.getFullYear()}`
-    if (reverse) dateString = dateString.split("-").reverse().join("-")
-    console.log("Formatted date: ", dateString)
-    return dateString
-}
-
-function format(i, length) {
-    i = i.toString()
-    if (i.length < length) {
-        return (i = "0" + i)
-    }
-    return i
 }
