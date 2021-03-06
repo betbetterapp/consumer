@@ -111,7 +111,7 @@ async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promi
 
 async function ensureMatchEnd(fixtures: Fixture[]) {
     let allFinished = true
-    const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${fixtures[0].league.id}&season=2020&date=${new Date().formatDate(true)}`
+    const url = `${FOOTBALL_API_BASE_URL}/fixtures?league=${fixtures[0].league.id}&season=2020&date=${new Date().parse()}`
     const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
     const response: Fixture[] = data.response
     log.header("Ensuring match end")
