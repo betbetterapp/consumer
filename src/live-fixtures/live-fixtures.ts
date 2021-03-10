@@ -1,5 +1,5 @@
 import FixtureModel from "../models/FixtureModel.js"
-import { Fixture, FixtureLeague, FOOTBALL_API_KEY, FOOTBALL_API_BASE_URL } from "../index.js"
+import { Fixture, FixtureLeague, FOOTBALL_API_BASE_URL, FOOTBALL_API_KEY } from "../index.js"
 import schedule from "node-schedule"
 import axios from "axios"
 import { log } from "../utils/log.js"
@@ -8,6 +8,11 @@ import * as db from "../database.js"
 import LiveFixtureModel, { LiveFixture } from "../models/LiveFixtureModel.js"
 
 let fixturesPerJob: { [identifier: string]: Fixture[] }
+
+// contains the amount of minutes for every job to wait before its next request
+let requestDelayPerJob: { [identifier: string]: number }
+
+const totalAvailableRequests = 85
 
 export async function scheduleLivePulling() {
     const fixtures = await getAllFixtureItems()
@@ -30,16 +35,31 @@ export async function scheduleLivePulling() {
         const alreadyScheduled: string[] = []
         fixturesPerJob = {}
 
+        const queued: (() => Promise<void>)[] = []
+        const queue = (func: () => Promise<void>) => queued.push(func)
+
         for (const fixture of fixturesToday) {
             const identifier = `${fixture.league.id}@${fixture.fixture.timestamp}`
             if (alreadyScheduled.includes(identifier)) {
-                log.info(`Already got job including ${stringify(fixture)}`)
+                log.info(`Already got queued job including ${stringify(fixture)}`)
             } else {
-                await scheduleJob(fixture.league, fixture.fixture.timestamp)
-                log.info(`Scheduled new job for ${stringify(fixture)}`)
+                queue(async () => await scheduleJob(fixture.league, fixture.fixture.timestamp))
+                log.info(`Created new job for ${stringify(fixture)}`)
                 alreadyScheduled.push(identifier)
             }
             fixturesPerJob[identifier] = (fixturesPerJob[identifier] ?? []).concat(fixture)
+        }
+
+        requestDelayPerJob = {}
+        Object.keys(fixturesPerJob).forEach(identifier => {
+            const fixtures = fixturesPerJob[identifier]
+            const share = fixtures.length / fixturesToday.length
+            const requests = totalAvailableRequests * share
+            requestDelayPerJob[identifier] = Math.ceil(110 / requests)
+        })
+
+        for (const it of queued) {
+            await it()
         }
     } else {
         log.info("There are no matches today!")
@@ -47,15 +67,23 @@ export async function scheduleLivePulling() {
 }
 
 async function scheduleJob(league: FixtureLeague, startTime: number) {
+    const coveredFixtures = fixturesPerJob[`${league.id}@${startTime}`]
+    log.header(`Scheduling job for ${coveredFixtures.length} fixture(s)...`)
+    coveredFixtures.forEach(it => log.info(c.gray("> ") + stringify(it)))
+
+    const myRequestDelay = requestDelayPerJob[`${league.id}@${startTime}`]
+    const timeoutInMillis = myRequestDelay * 60 * 1000
+    log.info("Request delay: " + c.red(myRequestDelay + " min"))
+
     const action = async () => {
         log.info(`Starting live pulling for ${stringifyLeague(league)}...`)
-        if (await pullLiveFixtures(league, startTime)) {
+        if (await pullLiveFixtures(league, startTime, coveredFixtures)) {
             const id = setInterval(async () => {
-                if (!(await pullLiveFixtures(league, startTime))) {
+                if (!(await pullLiveFixtures(league, startTime, coveredFixtures))) {
                     clearInterval(id)
                     log.info(`Finished live pulling for ${stringifyLeague(league)}`)
                 }
-            }, 450_000)
+            }, timeoutInMillis)
         } else {
             log.err(`First live pull for ${stringifyLeague(league)} failed, abandoning...`)
         }
@@ -66,11 +94,11 @@ async function scheduleJob(league: FixtureLeague, startTime: number) {
 
     if (job == null) {
         log.warn("Match has already started, instantly invoking job")
-        action()
+        await action()
     }
 }
 
-async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promise<boolean> {
+async function pullLiveFixtures(league: FixtureLeague, startTime: number, coveredFixtures: Fixture[]): Promise<boolean> {
     try {
         const url = `${FOOTBALL_API_BASE_URL}/fixtures?live=all&league=${league.id}`
         const { data } = await axios.get(url, { headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } })
@@ -82,15 +110,14 @@ async function pullLiveFixtures(league: FixtureLeague, startTime: number): Promi
             return false
         } else if (response.length === 0 && Date.now() > startTime * 1000 + 600_000) {
             log.info(`No more live games for league in ${league.name}`)
-            const coveredFixtures = fixturesPerJob[`${league.id}@${startTime}`]
 
             const matchEnd = await ensureMatchEnd(coveredFixtures)
             if (matchEnd.finished) {
-                matchEnd.matches.forEach(async match => {
+                for (const match of matchEnd.matches) {
                     log.info(`Inserting fixture with ${match.fixture.id} in fixture collection.`)
                     await FixtureModel.updateOne({ "fixture.id": match.fixture.id }, { $set: match })
                     await LiveFixtureModel.deleteOne({ "fixture.id": match.fixture.id })
-                })
+                }
                 return false
             }
         }
