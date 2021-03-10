@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "",
     "main": "index.js",
-    "type": "module",
+    "type": "commonjs",
     "scripts": {
         "start": "set NODE_ENV=production&& node build",
         "dev": "set NODE_ENV=development&& tsc && node build",
